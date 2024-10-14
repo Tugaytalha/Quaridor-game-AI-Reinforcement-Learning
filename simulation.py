@@ -1,36 +1,43 @@
+## TODO LIST:
+# 1. Implement reset method to reset the game state
+# 2. Implement reward system for the RL agent
+# 3. Implement play(action)-> state, reward, done, info method for RL agent
+
 class Quoridor:
-    def __init__(self):
+    def __init__(self, training_mode=False):
         # 9x9 game board
         self.board_size = 9
+        self.training_mode = training_mode  # Training mode toggle
+        self.reset()
+
+    def reset(self):
+        # Reset the game state
         self.p1_pos = [0, 4]  # Player 1 starts at row 0, column 4
         self.p2_pos = [8, 4]  # Player 2 starts at row 8, column 4
         self.p1_walls = 10
         self.p2_walls = 10
-        # Store vertical and horizontal walls as sets
-        self.horizontal_walls = set()  # Format: (x, y) where wall is between (x,y) and (x+1,y)
-        self.vertical_walls = set()    # Format: (x, y) where wall is between (x,y) and (x,y+1)
+        self.horizontal_walls = set()  # Format: (x, y)
+        self.vertical_walls = set()    # Format: (x, y)
         self.current_player = 1  # Player 1 starts the game
 
     def display_board(self):
-        # Display the board with players and walls
+        if self.training_mode:
+            return  # Skip displaying the board in training mode
+
+        # Normal gameplay board display
         for row in range(self.board_size):
-            # Display the player positions
             for col in range(self.board_size):
-                # Use end to display vertical walls between columns
                 end = ' '
                 if (row, col) in self.vertical_walls or (row - 1, col) in self.vertical_walls:
-                    end = '|'  # Display vertical wall
-
+                    end = '|'
                 if [row, col] == self.p1_pos:
                     print('1', end=end)
                 elif [row, col] == self.p2_pos:
                     print('2', end=end)
                 else:
                     print('.', end=end)
+            print()  # Newline after each row
 
-            print()  # Newline after every row
-
-            # Display horizontal walls between rows
             if row < self.board_size - 1:
                 for col in range(self.board_size):
                     if (row, col) in self.horizontal_walls:
@@ -39,7 +46,6 @@ class Quoridor:
                         print(' ', end=' ')
                 print()
 
-        # Display the number of walls left
         print(f"Player 1 Walls: {self.p1_walls} | Player 2 Walls: {self.p2_walls}\n")
 
     def check_wall_between(self, player_pos, new_pos):
@@ -159,35 +165,36 @@ class Quoridor:
         return False
 
     def get_player_input(self):
+        if self.training_mode:
+            return None  # Skip input handling in training mode
+
         while True:
             choice = input(f"Player {self.current_player}, Move (M) or Place Wall (W)? ").strip().upper()
             if choice == 'M':
-                # Ask for direction and perform a move
                 direction = input("Move (U)p, (D)own, (L)eft, (R)ight: ").strip().upper()
                 x, y = self.p1_pos if self.current_player == 1 else self.p2_pos
-                if direction == 'U' :
-                    amount = self.is_valid_move([x, y], [x-1, y])
+                if direction == 'U':
+                    amount = self.is_valid_move([x, y], [x - 1, y])
                     if amount:
-                        return 'M', [x-amount, y]
-                elif direction == 'D' :
-                    amount = self.is_valid_move([x, y], [x+1, y])
+                        return 'M', [x - amount, y]
+                elif direction == 'D':
+                    amount = self.is_valid_move([x, y], [x + 1, y])
                     if amount:
-                        return 'M', [x+amount, y]
+                        return 'M', [x + amount, y]
                 elif direction == 'L':
-                    amount = self.is_valid_move([x, y], [x, y-1])
+                    amount = self.is_valid_move([x, y], [x, y - 1])
                     if amount:
-                        return 'M', [x, y-amount]
+                        return 'M', [x, y - amount]
                 elif direction == 'R':
-                    amount = self.is_valid_move([x, y], [x, y+1])
+                    amount = self.is_valid_move([x, y], [x, y + 1])
                     if amount:
-                        return 'M', [x, y+amount]
+                        return 'M', [x, y + amount]
                 else:
                     print("Invalid move. Try again.")
             elif choice == 'W':
                 if (self.current_player == 1 and self.p1_walls == 0) or (self.current_player == 2 and self.p2_walls == 0):
                     print("No walls left!")
                     continue
-                # Ask for wall position and direction
                 direction = input("Wall direction (H)orizontal or (V)ertical: ").strip().upper()
                 if direction not in ['H', 'V']:
                     print("Invalid wall direction.")
@@ -198,13 +205,21 @@ class Quoridor:
 
     def play_game(self):
         while True:
-            self.display_board()
-            action, move = self.get_player_input()
-            if action.upper() == 'M':
+            if not self.training_mode:
+                self.display_board()
+
+            if self.training_mode:
+                # In training mode, input will be handled differently by the RL algorithm
+                action, move = None, None
+                # Assuming you provide a method or action list for RL training
+            else:
+                action, move = self.get_player_input()
+
+            if action == 'M':
                 self.move_player(move)
                 if self.check_win():
                     break
-            elif action.upper() == 'W':
+            elif action == 'W':
                 direction, x, y = move
                 if self.place_wall(direction, x, y):
                     if self.current_player == 1:
@@ -215,6 +230,18 @@ class Quoridor:
                     print("Invalid wall placement. Try again.")
                     continue
             self.switch_turn()
+
+    def get_game_state(self):
+        """Expose the game state for training mode."""
+        return {
+            "player_1": self.p1_pos,
+            "player_2": self.p2_pos,
+            "p1_walls": self.p1_walls,
+            "p2_walls": self.p2_walls,
+            "horizontal_walls": list(self.horizontal_walls),
+            "vertical_walls": list(self.vertical_walls),
+            "current_player": self.current_player
+        }
 
 
 if __name__ == "__main__":
