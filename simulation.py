@@ -42,24 +42,75 @@ class Quoridor:
         # Display the number of walls left
         print(f"Player 1 Walls: {self.p1_walls} | Player 2 Walls: {self.p2_walls}\n")
 
+    def check_wall_between(self, player_pos, new_pos):
+        x, y = player_pos
+        nx, ny = new_pos
+
+        # Moving horizontally
+        if x == nx:
+            if y < ny and ((x, y) in self.vertical_walls or (x - 1, y) in self.vertical_walls):
+                return False
+            if y > ny and ((x, y - 1) in self.vertical_walls or (x - 1, y - 1) in self.vertical_walls):
+                return False
+        # Moving vertically
+        elif y == ny:
+            if x < nx and ((x, y) in self.horizontal_walls or (x, y - 1) in self.horizontal_walls):  # Down move blocked
+                return False
+            if x > nx and (
+                    (x - 1, y) in self.horizontal_walls or (x - 1, y - 1) in self.horizontal_walls):  # Up move blocked
+                return False
+        return True
+
+    def jump_over(self, player_pos, jump_pos, opponent_pos):
+        """Handle jumping over the opponent"""
+        if not (0 <= jump_pos[0] < self.board_size and 0 <= jump_pos[1] < self.board_size):
+            return False  # Jump position out of bounds
+
+        # If the jump is valid (no walls between opponent and jump position)
+        if self.check_wall_between(opponent_pos, jump_pos):
+            return True
+
+        # # If we can't jump directly, check for diagonal jump
+        # x, y = player_pos
+        # ox, oy = opponent_pos
+        #
+        # if x == ox:  # Same row, check left and right diagonal
+        #     if self.is_valid_move(player_pos, [x - 1, y]) or self.is_valid_move(player_pos, [x + 1, y]):
+        #         return True
+        # elif y == oy:  # Same column, check up and down diagonal
+        #     if self.is_valid_move(player_pos, [x, y - 1]) or self.is_valid_move(player_pos, [x, y + 1]):
+        #         return True
+
+        return False
+
     def is_valid_move(self, player_pos, new_pos):
         x, y = player_pos
         nx, ny = new_pos
+        opponent_pos = self.p1_pos if self.current_player == 2 else self.p2_pos
+
         # Check if within bounds
         if not (0 <= nx < self.board_size and 0 <= ny < self.board_size):
-            return False
-        # Check if there is a wall between the current position and the new position
-        if x == nx:  # Moving horizontally
-            if y < ny and ((x, y) in self.vertical_walls or (x-1, y) in self.vertical_walls):
-                return False
-            if y > ny and ((x, y-1) in self.vertical_walls or (x-1, y-1) in self.vertical_walls):
-                return False
-        elif y == ny:  # Moving vertically
-            if x < nx and ((x, y) in self.horizontal_walls or (x, y-1) in self.horizontal_walls):  # Down move blocked
-                return False
-            if x > nx and ((x-1, y) in self.horizontal_walls or (x-1, y-1) in self.horizontal_walls): # Up move blocked
-                return False
-        return True
+            return 0
+
+        # Check for jump over opponent
+        if [nx, ny] == opponent_pos:
+            # Determine direction of the opponent relative to the player
+            ox, oy = opponent_pos
+
+            if ox == x - 1 and oy == y:  # Opponent above
+                return 2 if self.jump_over(player_pos, [x - 2, y], [x - 1, y]) else 0
+            elif ox == x + 1 and oy == y:  # Opponent below
+                return 2 if self.jump_over(player_pos, [x + 2, y], [x + 1, y]) else 0
+            elif ox == x and oy == y - 1:  # Opponent to the left
+                return 2 if self.jump_over(player_pos, [x, y - 2], [x, y - 1]) else 0
+            elif ox == x and oy == y + 1:  # Opponent to the right
+                return 2 if self.jump_over(player_pos, [x, y + 2], [x, y + 1]) else 0
+
+        # Check for a direct adjacent move (without jumping)
+        if abs(nx - x) + abs(ny - y) == 1:
+            return 1 if self.check_wall_between(player_pos, new_pos) else 0
+
+        return 0
 
     def get_valid_moves(self, pos):
         x, y = pos
@@ -114,14 +165,22 @@ class Quoridor:
                 # Ask for direction and perform a move
                 direction = input("Move (U)p, (D)own, (L)eft, (R)ight: ").strip().upper()
                 x, y = self.p1_pos if self.current_player == 1 else self.p2_pos
-                if direction == 'U' and self.is_valid_move([x, y], [x-1, y]):
-                    return 'M', [x-1, y]
-                elif direction == 'D' and self.is_valid_move([x, y], [x+1, y]):
-                    return 'M', [x+1, y]
-                elif direction == 'L' and self.is_valid_move([x, y], [x, y-1]):
-                    return 'M', [x, y-1]
-                elif direction == 'R' and self.is_valid_move([x, y], [x, y+1]):
-                    return 'M', [x, y+1]
+                if direction == 'U' :
+                    amount = self.is_valid_move([x, y], [x-1, y])
+                    if amount:
+                        return 'M', [x-amount, y]
+                elif direction == 'D' :
+                    amount = self.is_valid_move([x, y], [x+1, y])
+                    if amount:
+                        return 'M', [x+amount, y]
+                elif direction == 'L':
+                    amount = self.is_valid_move([x, y], [x, y-1])
+                    if amount:
+                        return 'M', [x, y-amount]
+                elif direction == 'R':
+                    amount = self.is_valid_move([x, y], [x, y+1])
+                    if amount:
+                        return 'M', [x, y+amount]
                 else:
                     print("Invalid move. Try again.")
             elif choice == 'W':
