@@ -3,6 +3,21 @@
 # 2. Implement reward system for the RL agent
 # 3. Implement play(action)-> state, reward, done, info method for RL agent
 
+from collections import namedtuple
+
+import numpy as np
+
+
+class Direction:
+    UP = 'U'
+    DOWN = 'D'
+    LEFT = 'L'
+    RIGHT = 'R'
+
+
+Location = namedtuple('Location', ['x', 'y'])
+
+
 class Quoridor:
     def __init__(self, training_mode=False):
         # 9x9 game board
@@ -14,10 +29,10 @@ class Quoridor:
         # Reset the game state
         self.p1_pos = [0, 4]  # Player 1 starts at row 0, column 4
         self.p2_pos = [8, 4]  # Player 2 starts at row 8, column 4
-        self.p1_walls = 10
-        self.p2_walls = 10
+        self.p1_walls = 10  # Don't touch this
+        self.p2_walls = 10  # Don't touch this
         self.horizontal_walls = set()  # Format: (x, y)
-        self.vertical_walls = set()    # Format: (x, y)
+        self.vertical_walls = set()  # Format: (x, y)
         self.current_player = 1  # Player 1 starts the game
 
     def display_board(self):
@@ -122,14 +137,14 @@ class Quoridor:
         x, y = pos
         possible_moves = []
         # Check all four possible directions (up, down, left, right)
-        if x > 0 and self.is_valid_move(pos, [x-1, y]):  # Up
-            possible_moves.append([x-1, y])
-        if x < 8 and self.is_valid_move(pos, [x+1, y]):  # Down
-            possible_moves.append([x+1, y])
-        if y > 0 and self.is_valid_move(pos, [x, y-1]):  # Left
-            possible_moves.append([x, y-1])
-        if y < 8 and self.is_valid_move(pos, [x, y+1]):  # Right
-            possible_moves.append([x, y+1])
+        if x > 0 and self.is_valid_move(pos, [x - 1, y]):  # Up
+            possible_moves.append([x - 1, y])
+        if x < 8 and self.is_valid_move(pos, [x + 1, y]):  # Down
+            possible_moves.append([x + 1, y])
+        if y > 0 and self.is_valid_move(pos, [x, y - 1]):  # Left
+            possible_moves.append([x, y - 1])
+        if y < 8 and self.is_valid_move(pos, [x, y + 1]):  # Right
+            possible_moves.append([x, y + 1])
         return possible_moves
 
     def place_wall(self, wall_type, x, y):
@@ -192,7 +207,8 @@ class Quoridor:
                 else:
                     print("Invalid move. Try again.")
             elif choice == 'W':
-                if (self.current_player == 1 and self.p1_walls == 0) or (self.current_player == 2 and self.p2_walls == 0):
+                if (self.current_player == 1 and self.p1_walls == 0) or (
+                        self.current_player == 2 and self.p2_walls == 0):
                     print("No walls left!")
                     continue
                 direction = input("Wall direction (H)orizontal or (V)ertical: ").strip().upper()
@@ -233,15 +249,35 @@ class Quoridor:
 
     def get_game_state(self):
         """Expose the game state for training mode."""
-        return {
-            "player_1": self.p1_pos,
-            "player_2": self.p2_pos,
-            "p1_walls": self.p1_walls,
-            "p2_walls": self.p2_walls,
-            "horizontal_walls": list(self.horizontal_walls),
-            "vertical_walls": list(self.vertical_walls),
-            "current_player": self.current_player
-        }
+        # Convert the game state to a format suitable for the RL agent
+        h_walls_x, h_walls_y = zip(*self.horizontal_walls) if self.horizontal_walls else ([], [])
+        v_walls_x, v_walls_y = zip(*self.vertical_walls) if self.vertical_walls else ([], [])
+
+        # Fill the wall locations arrays with -1 to pad the array to a fixed size of 10
+        h_walls_x, h_walls_y, v_walls_x, v_walls_y = list(h_walls_x), list(h_walls_y), list(v_walls_x), list(v_walls_y)
+        h_walls_x.extend([-1] * (10 - len(h_walls_x)))
+        h_walls_y.extend([-1] * (10 - len(h_walls_y)))
+        v_walls_x.extend([-1] * (10 - len(v_walls_x)))
+        v_walls_y.extend([-1] * (10 - len(v_walls_y)))
+
+        # Convert wall locations to numpy arrays
+        h_walls_x = np.array(h_walls_x, dtype=int)
+        h_walls_y = np.array(h_walls_y, dtype=int)
+        v_walls_x = np.array(v_walls_x, dtype=int)
+        v_walls_y = np.array(v_walls_y, dtype=int)
+
+
+        state_f = [
+            self.p1_pos,
+            self.p2_pos,
+            self.p1_walls,
+            self.p2_walls,
+            self.current_player
+        ]
+
+        state = np.concatenate([np.array(state_f, dtype=int), h_walls_x, h_walls_y, v_walls_x, v_walls_y])
+
+        return state
 
 
 if __name__ == "__main__":
